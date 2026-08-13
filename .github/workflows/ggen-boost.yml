@@ -28,6 +28,6 @@ jobs:
         run: |
           "$GGEN_BIN" --version
           timeout 5s "$GGEN_BIN" sync run
-          cp -r generated /tmp/generated.first
+          cp -r consumer /tmp/consumer.first
           timeout 5s "$GGEN_BIN" sync run
-          diff -r /tmp/generated.first generated
+          diff -r /tmp/consumer.first consumer

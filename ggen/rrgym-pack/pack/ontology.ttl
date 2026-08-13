@@ -1,0 +1,10 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+
+<urn:rrgym:pack:v26.8.12> a prov:Entity ; dcterms:title "rrgym static contract pack" .
+<urn:rrgym:capability:observe> a skos:Concept ; skos:prefLabel "observe" .
+<urn:rrgym:capability:construct> a skos:Concept ; skos:prefLabel "construct" .
+<urn:rrgym:capability:do> a skos:Concept ; skos:prefLabel "do" .
+<urn:rrgym:policy:no-ambient-do> a odrl:Policy ; odrl:prohibition [ odrl:action <urn:rrgym:capability:do> ] .
