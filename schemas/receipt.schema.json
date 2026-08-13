@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rrgym:schema:receipt:v1",
+  "type": "object",
+  "required": ["schema", "receiptId", "sequence", "meetingId", "actionId", "actorId", "role", "consequence", "admitted", "action", "stateHash", "receiptHash"],
+  "properties": {
+    "schema": {"const": "urn:rrgym:receipt:v1"},
+    "receiptId": {"type": "string"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "priorHash": {"type": ["string", "null"]},
+    "meetingId": {"type": "string"},
+    "actionId": {"type": "string"},
+    "actorId": {"type": "string"},
+    "role": {"type": "string"},
+    "consequence": {"enum": ["READ", "CONSTRUCT", "DO"]},
+    "admitted": {"type": "boolean"},
+    "action": {"type": "object"},
+    "stateHash": {"type": "string", "pattern": "^sha256:"},
+    "receiptHash": {"type": "string", "pattern": "^sha256:"}
+  }
+}

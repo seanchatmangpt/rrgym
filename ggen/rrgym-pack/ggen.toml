@@ -1,0 +1,13 @@
+[project]
+name = "rrgym-pack"
+version = "26.8.12"
+
+[ontology]
+source = "ontology.ttl"
+
+[templates]
+dir = "templates"
+
+[[gates]]
+name = "rrgym_contract"
+query = "gates/010_contract.rq"

@@ -1,0 +1,5 @@
+SELECT ?violation WHERE {
+  { FILTER NOT EXISTS { <urn:rrgym:pack:v26.8.12> a <http://www.w3.org/ns/prov#Entity> } BIND("missing-pack-identity" AS ?violation) }
+  UNION
+  { FILTER NOT EXISTS { <urn:rrgym:policy:no-ambient-do> a <http://www.w3.org/ns/odrl/2/Policy> } BIND("missing-authority-policy" AS ?violation) }
+}

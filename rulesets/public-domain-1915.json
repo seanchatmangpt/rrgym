@@ -1,0 +1,8 @@
+{
+  "id": "urn:rrgym:ruleset:public-domain:1915-seed:v1",
+  "authorityClass": "PUBLIC_DOMAIN_SEED",
+  "sourceEdition": "Robert's Rules of Order Revised, Fourth Edition (1915)",
+  "warning": "Independent procedural encoding for research. It is not the current official RONR and is not legal or parliamentary advice.",
+  "currentOfficialProviderRequiredFor": ["production parliamentary advice", "organizations that adopted current RONR", "current official interpretations"],
+  "motions": ["MAIN", "AMEND", "REFER", "POSTPONE_DEFINITELY", "PREVIOUS_QUESTION", "ADJOURN", "RECONSIDER", "RESCIND"]
+}
