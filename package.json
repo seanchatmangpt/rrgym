@@ -1,6 +1,6 @@
 {
   "name": "rrgym",
-  "version": "26.8.12",
+  "version": "26.8.13",
   "description": "Executable parliamentary governance gym for planner leagues and institutional red teaming",
   "type": "module",
   "license": "UNLICENSED",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check src/*.js && node --test test/*.test.js",
+    "check": "node --check src/*.js && node --check src/*.mjs && node --test test/*.test.js",
     "doctor": "node bin/rrgym.js doctor"
   },
   "exports": {
