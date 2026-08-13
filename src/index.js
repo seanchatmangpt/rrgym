@@ -1,20 +1,17 @@
 import { createHash } from "node:crypto";
-// rrgym v26.8.12 constitutional kernel
-
-// ---- canonical.js ----
 
 export function canonicalJson(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const entries = Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  const entries = Object.entries(value)
+    .filter(([, current]) => current !== undefined)
+    .sort(([left], [right]) => left.localeCompare(right));
+  return `{${entries.map(([key, current]) => `${JSON.stringify(key)}:${canonicalJson(current)}`).join(",")}}`;
 }
 
 export function digest(value) {
   return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
 }
-
-// ---- receipt.js ----
 
 export function verifyReceiptChain(receipts) {
   let prior = null;
@@ -32,18 +29,27 @@ export class ReceiptLedger {
   append(input) {
     const sequence = this.#receipts.length + 1;
     const priorHash = this.#receipts.at(-1)?.receiptHash ?? null;
-    const unsigned = { schema: "urn:rrgym:receipt:v1", receiptId: `${input.meetingId}:${sequence}`, sequence, priorHash, ...input };
+    const unsigned = {
+      schema: "urn:rrgym:receipt:v1",
+      receiptId: `${input.meetingId}:${sequence}`,
+      sequence,
+      priorHash,
+      ...input,
+    };
     const receipt = Object.freeze({ ...unsigned, receiptHash: digest(unsigned) });
     this.#receipts.push(receipt);
     return receipt;
   }
 
-  all() { return Object.freeze([...this.#receipts]); }
+  all() {
+    return Object.freeze([...this.#receipts]);
+  }
 
-  verify() { return verifyReceiptChain(this.#receipts); }
+  verify() {
+    return verifyReceiptChain(this.#receipts);
+  }
 }
 
-// ---- rules.js ----
 const MOTION_RULES = Object.freeze({
   MAIN: { secondRequired: true, debatable: true, amendable: true, voteThreshold: "MAJORITY", precedence: 10 },
   AMEND: { secondRequired: true, debatable: true, amendable: true, voteThreshold: "MAJORITY", precedence: 30 },
@@ -52,15 +58,22 @@ const MOTION_RULES = Object.freeze({
   PREVIOUS_QUESTION: { secondRequired: true, debatable: false, amendable: false, voteThreshold: "TWO_THIRDS", precedence: 80 },
   ADJOURN: { secondRequired: true, debatable: false, amendable: false, voteThreshold: "MAJORITY", precedence: 100 },
   RECONSIDER: { secondRequired: true, debatable: true, amendable: false, voteThreshold: "MAJORITY", precedence: 20 },
-  RESCIND: { secondRequired: true, debatable: true, amendable: true, voteThreshold: "TWO_THIRDS", precedence: 20 }
+  RESCIND: { secondRequired: true, debatable: true, amendable: true, voteThreshold: "TWO_THIRDS", precedence: 20 },
 });
 
-const refusal = (code, message, ruleId) => ({ code, message, ruleId });
-const pending = state => { const id = state.pendingMotionIds.at(-1); return id ? state.motions[id] : undefined; };
+const refusal = (code, message, ruleId) => Object.freeze({ code, message, ruleId });
+const pending = state => {
+  const id = state.pendingMotionIds.at(-1);
+  return id ? state.motions[id] : undefined;
+};
 
 export function assertRulesetProvider(provider) {
-  for (const key of ["id", "source", "authorityClass"]) if (typeof provider?.[key] !== "string") throw new TypeError(`REFUSED:RULESET_PROVIDER_MISSING:${key}`);
-  for (const method of ["motionRule", "validate"]) if (typeof provider?.[method] !== "function") throw new TypeError(`REFUSED:RULESET_PROVIDER_MISSING:${method}`);
+  for (const key of ["id", "source", "authorityClass"]) {
+    if (typeof provider?.[key] !== "string") throw new TypeError(`REFUSED:RULESET_PROVIDER_MISSING:${key}`);
+  }
+  for (const method of ["motionRule", "validate"]) {
+    if (typeof provider?.[method] !== "function") throw new TypeError(`REFUSED:RULESET_PROVIDER_MISSING:${method}`);
+  }
   return provider;
 }
 
@@ -78,39 +91,74 @@ export class PublicDomain1915Ruleset {
   validate(state, actor, action) {
     if (state.phase !== "OPEN") return refusal("MEETING_ADJOURNED", "Meeting is not open.", "RRGYM-STATE-001");
     if (state.present.length < state.quorum) return refusal("QUORUM_NOT_MET", "Quorum is not present.", "RRGYM-QUORUM-001");
-    const chairOnly = new Set(["RECOGNIZE", "OPEN_DEBATE", "CLOSE_DEBATE", "CALL_VOTE", "ANNOUNCE_RESULT", "RULE_POINT_OF_ORDER", "ADJOURN_MEETING"]);
-    if (chairOnly.has(action.type) && actor.role !== "CHAIR") return refusal("ROLE_NOT_AUTHORIZED", `${action.type} requires CHAIR.`, "RRGYM-ROLE-001");
+
+    const chairOnly = new Set([
+      "RECOGNIZE",
+      "OPEN_DEBATE",
+      "CLOSE_DEBATE",
+      "CALL_VOTE",
+      "ANNOUNCE_RESULT",
+      "RULE_POINT_OF_ORDER",
+      "ADJOURN_MEETING",
+    ]);
+    if (chairOnly.has(action.type) && actor.role !== "CHAIR") {
+      return refusal("ROLE_NOT_AUTHORIZED", `${action.type} requires CHAIR.`, "RRGYM-ROLE-001");
+    }
 
     if (action.type === "INTRODUCE_MOTION") {
-      if (["OBSERVER", "PARLIAMENTARIAN"].includes(actor.role)) return refusal("ROLE_NOT_AUTHORIZED", "Role may not introduce motions.", "RRGYM-ROLE-002");
-      if (state.recognizedMemberId !== actor.actorId) return refusal("RECOGNITION_REQUIRED", "Member must be recognized before introducing a motion.", "RRGYM-RECOGNITION-001");
+      if (["OBSERVER", "PARLIAMENTARIAN"].includes(actor.role)) {
+        return refusal("ROLE_NOT_AUTHORIZED", "Role may not introduce motions.", "RRGYM-ROLE-002");
+      }
+      if (state.recognizedMemberId !== actor.actorId) {
+        return refusal("RECOGNITION_REQUIRED", "Member must be recognized before introducing a motion.", "RRGYM-RECOGNITION-001");
+      }
       const current = pending(state);
-      if (current && action.kind !== "AMEND" && this.motionRule(action.kind).precedence <= this.motionRule(current.kind).precedence) return refusal("MOTION_OUT_OF_ORDER", "Motion lacks precedence over pending question.", "RRGYM-PRECEDENCE-001");
+      if (
+        current
+        && action.kind !== "AMEND"
+        && this.motionRule(action.kind).precedence <= this.motionRule(current.kind).precedence
+      ) {
+        return refusal("MOTION_OUT_OF_ORDER", "Motion lacks precedence over pending question.", "RRGYM-PRECEDENCE-001");
+      }
       if (action.kind === "AMEND") {
-        if (!action.parentMotionId || !state.motions[action.parentMotionId]) return refusal("MOTION_OUT_OF_ORDER", "Amendment requires an existing parent motion.", "RRGYM-AMEND-001");
-        if (!this.motionRule(state.motions[action.parentMotionId].kind).amendable) return refusal("MOTION_OUT_OF_ORDER", "Parent motion is not amendable.", "RRGYM-AMEND-002");
+        if (!action.parentMotionId || !state.motions[action.parentMotionId]) {
+          return refusal("MOTION_OUT_OF_ORDER", "Amendment requires an existing parent motion.", "RRGYM-AMEND-001");
+        }
+        if (!this.motionRule(state.motions[action.parentMotionId].kind).amendable) {
+          return refusal("MOTION_OUT_OF_ORDER", "Parent motion is not amendable.", "RRGYM-AMEND-002");
+        }
       }
     }
 
     if (action.type === "RULE_POINT_OF_ORDER" || action.type === "APPEAL_RULING") {
       const point = state.pointsOfOrder?.[action.pointId];
       if (!point) return refusal("MOTION_NOT_FOUND", `Unknown point of order ${action.pointId}.`, "RRGYM-POINT-404");
-      if (action.type === "APPEAL_RULING" && point.status === "PENDING") return refusal("RESULT_NOT_READY", "A pending point cannot be appealed before the chair rules.", "RRGYM-APPEAL-001");
+      if (action.type === "APPEAL_RULING" && point.status === "PENDING") {
+        return refusal("RESULT_NOT_READY", "A pending point cannot be appealed before the chair rules.", "RRGYM-APPEAL-001");
+      }
     }
 
     if (action.motionId && action.type !== "INTRODUCE_MOTION") {
       const motion = state.motions[action.motionId];
       if (!motion) return refusal("MOTION_NOT_FOUND", `Unknown motion ${action.motionId}.`, "RRGYM-MOTION-404");
       const rule = this.motionRule(motion.kind);
-      if (action.type === "SECOND_MOTION" && !rule.secondRequired) return refusal("MOTION_NOT_SECONDABLE", "Motion does not require a second.", "RRGYM-SECOND-002");
-      if (action.type === "SECOND_MOTION" && actor.actorId === motion.makerId) return refusal("MOTION_NOT_SECONDABLE", "Maker may not second own motion in this seed model.", "RRGYM-SECOND-003");
+      if (action.type === "SECOND_MOTION" && !rule.secondRequired) {
+        return refusal("MOTION_NOT_SECONDABLE", "Motion does not require a second.", "RRGYM-SECOND-002");
+      }
+      if (action.type === "SECOND_MOTION" && actor.actorId === motion.makerId) {
+        return refusal("MOTION_NOT_SECONDABLE", "Maker may not second own motion in this seed model.", "RRGYM-SECOND-003");
+      }
       if (action.type === "OPEN_DEBATE") {
         if (!rule.debatable) return refusal("DEBATE_NOT_ALLOWED", `${motion.kind} is not debatable.`, "RRGYM-DEBATE-001");
         if (rule.secondRequired && !motion.secondedBy) return refusal("SECOND_REQUIRED", "Second required before debate.", "RRGYM-SECOND-001");
         if (motion.status === "DEBATING") return refusal("DEBATE_ALREADY_OPEN", "Debate is already open.", "RRGYM-DEBATE-002");
       }
-      if (action.type === "CLOSE_DEBATE" && motion.status !== "DEBATING") return refusal("DEBATE_NOT_OPEN", "Debate is not open.", "RRGYM-DEBATE-003");
-      if (action.type === "CALL_VOTE" && rule.secondRequired && !motion.secondedBy) return refusal("SECOND_REQUIRED", "Second required before vote.", "RRGYM-SECOND-001");
+      if (action.type === "CLOSE_DEBATE" && motion.status !== "DEBATING") {
+        return refusal("DEBATE_NOT_OPEN", "Debate is not open.", "RRGYM-DEBATE-003");
+      }
+      if (action.type === "CALL_VOTE" && rule.secondRequired && !motion.secondedBy) {
+        return refusal("SECOND_REQUIRED", "Second required before vote.", "RRGYM-SECOND-001");
+      }
       if (action.type === "CAST_VOTE") {
         if (motion.status !== "VOTING") return refusal("VOTE_NOT_OPEN", "Vote is not open.", "RRGYM-VOTE-001");
         if (!state.present.includes(action.memberId)) return refusal("ROLE_NOT_AUTHORIZED", "Only present members may vote.", "RRGYM-VOTE-003");
@@ -119,31 +167,42 @@ export class PublicDomain1915Ruleset {
       }
       if (action.type === "ANNOUNCE_RESULT") {
         if (motion.status !== "VOTING") return refusal("RESULT_NOT_READY", "Motion is not in voting state.", "RRGYM-RESULT-001");
-        if (Object.keys(motion.votes).length < state.present.length) return refusal("RESULT_NOT_READY", "All present members must have a recorded vote or abstention in this seed model.", "RRGYM-RESULTE-002");
+        if (Object.keys(motion.votes).length < state.present.length) {
+          return refusal("RESULT_NOT_READY", "All present members must have a recorded vote or abstention in this seed model.", "RRGYM-RESULTE-002");
+        }
       }
     }
+
     return null;
   }
 }
 
-// ---- authority.js ----
 export class DenyDoAuthorityResolver {
   authorize(_state, _actor, _action, consequence) {
-    return consequence === "DO" ? { code: "AUTHORITY_REQUIRED", message: "DO requires explicit authority.", ruleId: "RRGYM-BRCE-001" } : null;
+    return consequence === "DO"
+      ? refusal("AUTHORITY_REQUIRED", "DO requires explicit authority.", "RRGYM-BRCE-001")
+      : null;
   }
 }
 
 export class AllowListAuthorityResolver {
-  constructor(grants = []) { this.grants = new Set(grants); }
-  add(grant) { this.grants.add(grant); }
+  constructor(grants = []) {
+    this.grants = new Set(grants);
+  }
+
+  add(grant) {
+    this.grants.add(grant);
+  }
+
   authorize(state, actor, action, consequence) {
     if (consequence !== "DO") return null;
     const grant = `${state.meetingId}:${actor.actorId}:${action.type}`;
-    return this.grants.has(grant) ? null : { code: "AUTHORITY_REQUIRED", message: `Missing explicit grant ${grant}.`, ruleId: "RRGYM-BRCE-001" };
+    return this.grants.has(grant)
+      ? null
+      : refusal("AUTHORITY_REQUIRED", `Missing explicit grant ${grant}.`, "RRGYM-BRCE-001");
   }
 }
 
-// ---- verification.js ----
 export class StatePostconditionVerifier {
   verify(observation, expected) {
     const state = observation.state;
@@ -151,160 +210,282 @@ export class StatePostconditionVerifier {
     if (expected.phase !== undefined && state.phase !== expected.phase) failures.push(`phase:${state.phase}!=${expected.phase}`);
     if (expected.pendingMotionIds !== undefined && JSON.stringify(state.pendingMotionIds) !== JSON.stringify(expected.pendingMotionIds)) failures.push("pendingMotionIds:mismatch");
     if (expected.motionStatus) {
-      for (const [id, status] of Object.entries(expected.motionStatus)) if (state.motions[id]?.status !== status) failures.push(`motion:${id}:${state.motions[id]?.status ?? "MISSING"}!=${status}`);
+      for (const [id, status] of Object.entries(expected.motionStatus)) {
+        if (state.motions[id]?.status !== status) failures.push(`motion:${id}:${state.motions[id]?.status ?? "MISSING"}!=${status}`);
+      }
     }
     return Object.freeze({ passed: failures.length === 0, failures: Object.freeze(failures) });
   }
 }
 
-// ---- engine.js ----
-
 export function createMeeting({ meetingId, rulesetId, members, present = members, quorum = Math.floor(members.length / 2) + 1 }) {
-  return Object.freeze({ meetingId, rulesetId, phase: "OPEN", members: [...members], present: [...present], quorum, motions: {}, pendingMotionIds: [], pointsOfOrder: {}, appeals: {}, actionCount: 0 });
+  return Object.freeze({ meetingId, rulesetId, phase: "OPEN", members: [...members], present: [...present], quorum, recognizedMemberId: null, motions: {}, pendingMotionIds: [], pointsOfOrder: {}, appeals: {}, actionCount: 0 });
 }
 
-const consequenceOf = action => ["CAST_VOTE", "ANNOUNCE_RESULTH‹Q“ÕT“—ÓQQUS‘È—Kš[˜ÛY\ÊXİ[Û‹\JHÈ‘ÈˆˆÓÓ”Õ•PÕÂ˜ÛÛœİÛÛ™Tİ]HHİ]HOˆİXİ\™YÛÛ™Jİ]JNÂ‚™[˜İ[Ûˆ›İT\ÜÙY
-[İ[Û‹™\ÚÛ
-HÂˆÛÛœİ›İ\ÈHØš™Xİ˜[Y\Ê[İ[Û‹›İ\ÊK™š[\ŠˆOˆˆOOHP”ÕRSˆŠNÂˆÛÛœİY\ÈH›İ\Ë™š[\ŠˆOˆˆOOH–QTÈŠK›[™İÂˆÛÛœİ›ÈH›İ\Ë™š[\ŠˆOˆˆOOH““ÈŠK›[™İÂˆYˆ
-›İ\Ë›[™İOOH
-H™]\›ˆ˜[ÙNÂˆ™]\›ˆ™\ÚÛOOH“PR“Ô’UHˆÈY\Èˆ›ÈˆY\È
-ˆÈH›İ\Ë›[™İ
-ˆÂŸB‚™^ÜÛ\ÜÈ\›X[Y[\Q[™Ú[™HÂˆÛÛœİXİÜŠ[\Ù]]]Üš]HH™]È[QĞ]]Üš]T™\ÛÛ™\Š
-JHÈ\Ëœ[\Ù]H\ÜÙ\[\Ù]›İšY\Š[\Ù]
-NÈ\Ë˜]]Üš]HH]]Üš]NÈ\Ë›YÙ\ˆH™]È™XÙZ\YÙ\Š
-NÈB‚ˆ\Jİ]KXİÜ‹Xİ[ÛŠHÂˆÛÛœİXİ[Û’YH	Üİ]K›YY][™ÒYN˜N‰Üİ]K˜Xİ[ÛÛİ[
-È_XÂˆÛÛœİÛÛœÙ\]Y[˜ÙHHÛÛœÙ\]Y[˜ÙSÙŠXİ[ÛŠNÂˆÛÛœİ™Y\Ø[H\Ëœ[\Ù]˜[Y]Jİ]KXİÜ‹Xİ[ÛŠHÏÈ\Ë˜]]Üš]K˜]]Üš^™Jİ]KXİÜ‹Xİ[Û‹ÛÛœÙ\]Y[˜ÙJNÂˆYˆ
-™Y\Ø[
-H™]\›ˆ\ËˆÙš[š\Ú
-İ]KXİÜ‹Xİ[Û‹Xİ[Û’YÛÛœÙ\]Y[˜ÙK˜[ÙK™Y\Ø[
-NÂ‚ˆÛÛœİ™^HÛÛ™Tİ]Jİ]JNÂˆ™^˜Xİ[ÛÛİ[
-ÏHNÂˆ™^›\İXİ[Û’YHXİ[Û’YÂˆİÚ]Ú
-Xİ[Û‹\JHÂˆØ\ÙH”‘PÓÑÓ’V‘Hˆ™^œ™XÛÙÛš^™YY[X™\’YHXİ[Û‹›Y[X™\’YÈœ™XZÎÂˆØ\ÙH’S•“ÑPÑWÓSÕSÓˆ‚ˆ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YHHÈYˆXİ[Û‹›[İ[Û’YÚ[™ˆXİ[Û‹šÚ[™^ˆXİ[Û‹^XZÙ\’YˆXİÜ‹˜XİÜ’Y‹‹ŠXİ[Û‹œ\™[[İ[Û’YÈÈ\™[[İ[Û’YˆXİ[Û‹œ\™[[İ[Û’YHˆßJKİ]\Îˆ”“ÔÔÑQ‹›İ\ÎˆßHNÂˆ™^œ[™[™Ó[İ[Û’YËœ\Ú
-Xİ[Û‹›[İ[Û’Y
-NÈ™^œ™XÛÙÛš^™YY[X™\’YH[™Yš[™YÈœ™XZÎÂˆØ\ÙH”ÑPÓÓ‘ÓSÕSÓˆˆ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YKœÙXÛÛ™YHHXİÜ‹˜XİÜ’YÈ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YKœİ]\ÈH”S‘S‘ÈÈœ™XZÎÂˆØ\ÙH“ÔS—ÑPUHˆ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YKœİ]\ÈH‘PUS‘ÈÈœ™XZÎÂˆØ\ÙHÓÔÑWÑPUHˆ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YKœİ]\ÈH”S‘S‘ÈÈœ™XZÎÂˆØ\ÙHĞSÕ“ÕHˆ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YKœİ]\ÈH•“ÕS‘ÈÈœ™XZÎÂˆØ\ÙHĞTÕÕ“ÕHˆ™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YK›İ\ÖØXİ[Û‹›Y[X™\’YHHXİ[Û‹›İNÈœ™XZÎÂˆØ\ÙHS““ÕSÑWÔ‘TÕSˆÈÛÛœİHH™^›[İ[ÛœÖØXİ[Û‹›[İ[Û’YNÈKœİ]\ÈH›İT\ÜÙY
-K\Ëœ[\Ù]›[İ[Û”[JKšÚ[™
-K›İU™\ÚÛ
-HÈQÔQˆˆ”‘R‘PÕQÈ™^œ[™[™Ó[İ[Û’YÈH™^œ[™[™Ó[İ[Û’YË™š[\ŠYOˆYOOHKšY
-NÈœ™XZÎÈBˆØ\ÙHQ“ÕT“—ÓQQUS‘Èˆ™^œ\ÙHHQ“ÕT“‘QÈœ™XZÎÂˆØ\ÙH”ÒS•ÓÑ—ÓÔ‘TˆˆÂˆÛÛœİÚ[YH	ØXİ[Û’YNœÚ[Âˆ™^œÚ[ÓÙ“Ü™\–ÜÚ[YHHÈYˆÚ[Y˜Z\ÙYNˆXİÜ‹˜XİÜ’YYØZ[œİXİ[Û’YˆXİ[Û‹˜YØZ[œİXİ[Û’Y™X\ÛÛˆXİ[Û‹œ™X\ÛÛ‹İ]\Îˆ”S‘S‘ÈˆNÂˆœ™XZÎÂˆBˆØ\ÙH”•SWÔÒS•ÓÑ—ÓÔ‘TˆˆÂˆÛÛœİÚ[H™^œÚ[ÓÙ“Ü™\–ØXİ[Û‹œÚ[YNÂˆYˆ
-\Ú[
-H›İÈ™]È\œ›ÜŠ‘Q•TÑQ”ÒS•Ó“ÕÑ“ÕS‘‰ØXİ[Û‹œÚ[YX
-NÂˆÚ[œİ]\ÈHXİ[Û‹œ[[™ÎÈÚ[œ[YHHXİÜ‹˜XİÜ’YÂˆœ™XZÎÂˆBˆØ\ÙHTPSÔ•SS‘ÈˆÂˆÛÛœİÚ[H™^œÚ[ÓÙ“Ü™\–ØXİ[Û‹œÚ[YNÂˆYˆ
-\Ú[Ú[œİ]\ÈOOH”S‘S‘ÈŠH›İÈ™]È\œ›ÜŠ‘Q•TÑQ”ÒS•Ó“ÕÔ’TWÑ“Ô—ĞTPS‰ØXİ[Û‹œÚ[YX
-NÂˆÛÛœİ\X[YH	ØXİ[Û’YN˜\X[Âˆ™^˜\X[ÖØ\X[YHHÈYˆ\X[YÚ[YˆXİ[Û‹œÚ[Y\X[YNˆXİÜ‹˜XİÜ’Yİ]\Îˆ”S‘S‘ÈˆNÂˆœ™XZÎÂˆBˆY˜][ˆ›İÈ™]È\œ›ÜŠ‘Q•TÑQ•S’Ó“ÕÓ—ĞPÕSÓ‰ØXİ[Û‹\_X
-NÂˆBˆ™]\›ˆ\ËˆÙš[š\Ú
-Øš™Xİ™œ™Y^™J™^
-KXİÜ‹Xİ[Û‹Xİ[Û’YÛÛœÙ\]Y[˜ÙKYJNÂˆB‚ˆÙš[š\Ú
-İ]KXİÜ‹Xİ[Û‹Xİ[Û’YÛÛœÙ\]Y[˜ÙKYZ]Y™Y\Ø[
-HÂˆÛÛœİ™XÙZ\H\Ë›YÙ\‹˜\[™
-ÈYY][™ÒYˆİ]K›YY][™ÒYXİ[Û’YXİÜ’YˆXİÜ‹˜XİÜ’Y›ÛNˆXİÜ‹œ›ÛKÛÛœÙ\]Y[˜ÙKYZ]YXİ[Û‹‹‹Š™Y\Ø[ÈÈ™Y\Ø[HˆßJKİ]R\Úˆ™XÙZ\YÙ\”İ]Kš\Ú
-İ]JHJNÂˆ™]\›ˆØš™Xİ™œ™Y^™JÈYZ]Yİ]KXİ[Û’YÛÛœÙ\]Y[˜ÙK‹‹Š™Y\Ø[ÈÈ™Y\Ø[HˆßJK™XÙZ\JNÂˆBŸB‚˜ÛÛœİ™XÙZ\YÙ\”İ]HHÈ\ÚˆYÙ\İNÂ‚‹ËÈKKKH[›™\‹šœÈKKKB™^Ü[˜İ[ÛˆYZ][›™\Š[›™\‹›ÛJHÂˆ™]\›ˆ[›™\‹˜ÛÛ\]X›T›Û\Ëš\Ê›ÛJBˆÈØš™Xİ™œ™Y^™JÈ[›™\’Yˆ[›™\‹šY›ÛKYZ]YˆYHJBˆˆØš™Xİ™œ™Y^™JÈ[›™\’Yˆ[›™\‹šY›ÛKYZ]Yˆ˜[ÙK™X\ÛÛˆ‘Q•TÑQ”S“‘T—Ô“ÓWÒSÓÓTUP“N‰Ü[›™\‹šYN‰Ü›Û_XJNÂŸB‚™^Ü[˜İ[Ûˆ^[Ù™”™XÛÜ™
-È\\ÛÙRY[›™\’Y›ÛK][]HH[Uš[Û][ÛœÈHXÚ\Ú[ÛœÔ™XXÚYH™YÜ™]HJHÂˆ™]\›ˆØš™Xİ™œ™Y^™JÈ\\ÛÙRY[›™\’Y›ÛK][]K[Uš[Û][ÛœËXÚ\Ú[ÛœÔ™XXÚY™YÜ™]JNÂŸB‚‹ËÈKKKHœ›ÛY\‹šœÈKKKB™^ÜÛÛœİœ›ÛY\”İ]\ÈHØš™Xİ™œ™Y^™JÈSU‘NˆSU‘H‹Q‘T”‘Qˆ‘Q‘T”‘Q‹SÒQ’QQˆ‘SÒQ’QQ‹‘Q•TÑQˆ”‘Q•TÑQ‹‘UT‘Qˆ”‘UT‘QˆJNÂ‚™^ÜÛ\ÜÈÜÜÚXš[]Qœ›ÛY\ˆÂˆÚ][\ÈH™]ÈX\
+const DO_ACTIONS = new Set(["CAST_VOTE", "ANNOUNCE_RESULT", "ADJOURN_MEETING"]);
+const READ_ACTIONS = new Set(["OBSERVE"]);
 
-NÂˆY
-Ø[™Y]JHÂˆYˆ
-XØ[™Y]OËšY
-H›İÈ™]È\Q\œ›ÜŠ˜Ø[™Y]KšY™\]Z\™YŠNÂˆYˆ
-\ËˆÚ][\Ëš\ÊØ[™Y]KšY
-JH›İÈ™]È\œ›ÜŠ‘Q•TÑQ‘TPĞUWĞĞS‘QUN‰ØØ[™Y]KšYX
-NÂˆ\ËˆÚ][\ËœÙ]
-Ø[™Y]KšYØš™Xİ™œ™Y^™JÈ‹‹˜Ø[™Y]Kİ]\Îˆœ›ÛY\”İ]\ËSU‘K]šY[˜ÙNˆ×HJJNÂˆ™]\›ˆ\Ë™Ù]
-Ø[™Y]KšY
-NÂˆBˆÙ]
-Y
-HÈ™]\›ˆ\ËˆÚ][\Ë™Ù]
-Y
-NÈBˆ[
+export function consequenceOf(action) {
+  if (DO_ACTIONS.has(action.type)) return "DO";
+  if (READ_ACTIONS.has(action.type)) return "READ";
+  return "CONSTRUCT";
+}
 
-HÈ™]\›ˆØš™Xİ™œ™Y^™JË‹‹\ËˆÚ][\Ë˜[Y\Ê
-WJNÈBˆY™\ŠY™X\ÛÛŠHÈ™]\›ˆ\Ëˆİ˜[œÚ][ÛŠYœ›ÛY\”İ]\Ë‘Q‘T”‘Q™X\ÛÛ‹˜[ÙJNÈBˆ™]š]™JY™X\ÛÛŠHÈ™]\›ˆ\Ëˆİ˜[œÚ][ÛŠYœ›ÛY\”İ]\ËSU‘K™X\ÛÛ‹˜[ÙJNÈBˆ˜[ÚYJY]šY[˜ÙJHÈYˆ
-Y]šY[˜ÙOËœ™XÙZ\\Ú
-H›İÈ™]È\œ›ÜŠ”‘Q•TÑQ‘SÒQ’PĞUSÓ—Ô‘TURT‘T×Ô‘PÑRTŠNÈ™]\›ˆ\Ëˆİ˜[œÚ][ÛŠYœ›ÛY\”İ]\Ë‘SÒQ’QQ]šY[˜ÙKYJNÈBˆ™Y\ÙJY]šY[˜ÙJHÈYˆ
-Y]šY[˜ÙOËœ[RY
-H›İÈ™]È\œ›ÜŠ”‘Q•TÑQ”‘Q•TĞSÔ‘TURT‘T×Ô•SHŠNÈ™]\›ˆ\Ëˆİ˜[œÚ][ÛŠYœ›ÛY\”İ]\Ë”‘Q•TÑQ]šY[˜ÙKYJNÈBˆİ˜[œÚ][ÛŠYİ]\Ë]šY[˜ÙK\›Z[˜[
-HÂˆÛÛœİİ\œ™[]\ËˆÚ][\Ë™Ù]
-Y
-NÈYˆ
-Xİ\œ™[
-H›İÈ™]È\œ›ÜŠ‘Q•TÑQĞS‘QUWÓ“ÕÑ“ÕS‘‰ÚYX
-NÂˆYˆ
-Ñœ›ÛY\”İ]\Ë‘SÒQ’QQœ›ÛY\”İ]\Ë”‘Q•TÑQœ›ÛY\”İ]\Ë”‘UT‘QKš[˜ÛY\Êİ\œ™[œİ]\ÊJH›İÈ™]È\œ›ÜŠ‘Q•TÑQ•T“RSSĞĞS‘QUN‰ÚYN‰Øİ\œ™[œİ]\ßX
-NÂˆÛÛœİ™^SØš™Xİ™œ™Y^™JÈ‹‹˜İ\œ™[İ]\Ë\›Z[˜[]šY[˜ÙN“Øš™Xİ™œ™Y^™JË‹‹˜İ\œ™[™]šY[˜ÙK]šY[˜ÙWJHJNÈ\ËˆÚ][\ËœÙ]
-Y™^
-NÈ™]\›ˆ™^ÂˆBŸB‚‹ËÈKKKHÛXØKšœÈKKKB™^Ü[˜İ[Ûˆ[ØØ]PÓPĞJØ[™Y]\ËYÙ]
-HÂˆYˆ
-S[X™\‹š\Ñš[š]JYÙ]
-HYÙ]
-H›İÈ™]È˜[™ÙQ\œ›ÜŠ˜YÙ]]\İ™Hš[š]H[™›Û‹[™YØ]]™HŠNÂˆÛÛœİ]Ù[HØ[™Y]\Ë™š[\ŠÈOˆË˜YZ]Y
-NÂˆYˆ
-]Ù[›[™İOOH
-H™]\›ˆØš™Xİ™œ™Y^™J×JNÂˆÛÛœİØÛÜ™\ÈH]Ù[›X\
-ÈOˆX]›X^
-
-Ë™^XİY][]H
-ÈË[˜Ù\Z[H
-ÈË››İ™[H
-ÈËœ™]™\œÚXš[]H
-ÈË™]šY[˜ÙJHÈX]›X^
-Ë˜ÛÜİYKNJJJNÂˆÛÛœİİ[HØÛÜ™\Ëœ™YXÙJ
-KŠHOˆH
-È‹
-NÂˆ™]\›ˆØš™Xİ™œ™Y^™J]Ù[›X\
+function cloneState(state) {
+  return structuredClone(state);
+}
 
-ËJHOˆØš™Xİ™œ™Y^™JÈØ[™Y]RYˆËšYX\ÜÎˆİ[OOHÈYÙ]È]Ù[›[™İˆYÙ]
-ˆØÛÜ™\ÖÚWHÈİ[Y™\œ™Yˆİ[OOH	‰ˆØÛÜ™\ÖÚWHOOHJJJNÂŸB‚‹ËÈKKKHY]šXÜËšœÈKKKB™^Ü[˜İ[ÛˆYX\İ\™QÛİ™\›˜[˜ÙJİ]JHÂˆÛÛœİ[İ[ÛœÈHØš™Xİ˜[Y\Êİ]K›[İ[ÛœÊNÂˆÛÛœİ\ÜÜÙYH[İ[ÛœË™š[\ŠHOˆÈQÔQ‹”‘R‘PÕQ—Kš[˜ÛY\ÊKœİ]\ÊJK›[™İÂˆÛÛœİ›İ\œÈH™]ÈÙ]
-[İ[ÛœË™›]X\
-HOˆØš™XİšÙ^\ÊK›İ\ÊJJNÂˆÛÛœİ›İ\ÈH[İ[ÛœË™›]X\
-HOˆØš™Xİ˜[Y\ÊK›İ\ÊJK™š[\ŠˆOˆˆOOHP”ÕRSˆŠNÂˆÛÛœİ›ÈH›İ\Ë™š[\ŠˆOˆˆOOH““ÈŠK›[™İÂˆ™]\›ˆØš™Xİ™œ™Y^™JÂˆ\ÜÜÚ][Û”˜]Nˆ[İ[ÛœË›[™İÈ\ÜÜÙYÈ[İ[ÛœË›[™İˆˆ\XÚ\][Û”˜]Nˆİ]Kœ™\Ù[›[™İÈ›İ\œËœÚ^™HÈİ]Kœ™\Ù[›[™İˆˆZ[›Üš]T›İXİ[Û”›ŞNˆ›İ\Ë›[™İÈ›ÈÈ›İ\Ë›[™İˆKˆ›ØÙY\˜[Y™šXÚY[˜ŞNˆİ]K˜Xİ[ÛÛİ[È\ÜÜÙYÈİ]K˜Xİ[ÛÛİ[ˆˆ[œ™\ÛÛ™YÜÜÚXš[]Nˆİ]Kœ[™[™Ó[İ[Û’YË›[™İˆJNÂŸB‚‹ËÈKKKHØÙ[šœÈKKKB™^Ü[˜İ[Ûˆ™XÙZ\ÕÓØÙ[
-™XÙZ\ËÈÙÒYH\›œœ™Ş[N›ØÙ[ŒHˆHHßJHÂˆÛÛœİ]™[ÈHßNÈÛÛœİØš™XİÈHßNÂˆ›Üˆ
-ÛÛœİˆÙˆ™XÙZ\ÊHÂˆÛÛœİYY][™ÓØš™XİHYY][™Î‰Ü‹›YY][™ÒYXÈÛÛœİXİÜ“Øš™XİHXİÜ‰Ü‹˜XİÜ’YXÂˆØš™XİÖÛYY][™ÓØš™XİHÏÏHÈ\Nˆ›YY][™È‹]šX]\ÎˆŞÈ˜[YNˆ›YY][™ÒY‹˜[YNˆ‹›YY][™ÒYWHNÂˆØš™XİÖØXİÜ“Øš™XİHÏÏHÈ\Nˆ˜XİÜˆ‹]šX]\ÎˆŞÈ˜[YNˆœ›ÛH‹˜[YNˆ‹œ›ÛHWHNÂˆ]™[ÖÜ‹œ™XÙZ\YHHÂˆ\Nˆ‹˜YZ]YÈ˜YZ]Y]˜[œÚ][Ûˆˆˆœ™Y\ÙY]˜[œÚ][Ûˆ‹ˆ[YNˆ™]È]J
-KÒTÓÔİš[™Ê
-Kˆ]šX]\ÎˆÂˆÈ˜[YNˆ˜Xİ[Û’Y‹˜[YNˆ‹˜Xİ[Û’YKˆÈ˜[YNˆ˜Xİ[Û•\H‹˜[YNˆ‹˜Xİ[Û‹\HKˆÈ˜[YNˆ˜ÛÛœÙ\]Y[˜ÙH‹˜[YNˆ‹˜ÛÛœÙ\]Y[˜ÙHKˆÈ˜[YNˆœ™XÙZ\\Ú‹˜[YNˆ‹œ™XÙZ\\ÚKˆ‹‹Š‹œ™Y\Ø[ÈŞÈ˜[YNˆœ™Y\Ø[ÛÙH‹˜[YNˆ‹œ™Y\Ø[˜ÛÙHWHˆ×JBˆKˆ™[][ÛœÚ\ÎˆŞÈØš™XİYˆYY][™ÓØš™Xİ]X[YšY\ˆ›YY][™ÈˆKÈØš™XİYˆXİÜ“Øš™Xİ]X[YšY\ˆ˜XİÜˆˆWBˆNÂˆBˆ™]\›ˆØš™Xİ™œ™Y^™JÈØÙ[™\œÚ[ÛˆŒ‹Œ‹ÙÒY]™[\\ÎˆÈ˜YZ]Y]˜[œÚ][Ûˆ‹œ™Y\ÙY]˜[œÚ][Ûˆ—KØš™Xİ\\ÎˆÈ›YY][™È‹˜XİÜˆ—K]™[ËØš™XİÈJNÂŸB‚‹ËÈKKKH™YX[KšœÈKKKB™^ÜÛÛœİ“ĞÑQTSĞUPÒÔÈHØš™Xİ™œ™Y^™JÂˆÈYˆ˜YÙ[™KXØ\\™H‹Øš™Xİ]™NˆÛÛ›ÛÚXÚ]Y\İ[ÛœÈ™XXÚ\ÜÜÚ][Ûˆ‹ØœÙ\˜X›Nˆ™\ÜÜÚ][ÛˆÚÙ]È[™\ˆY[XØ[™Y™\™[˜Ù\ÈˆKˆÈYˆ˜[Y[™Y[Y›ÛÙ‹Øš™Xİ]™NˆÛÛœİ[YH[X™\˜][ÛˆYÙ]Ú]]Ù[[Y[™Y[È‹ØœÙ\˜X›Nˆ˜Xİ[ÛœÈ\ˆ\ÜÜÙY[İ[ÛˆˆKˆÈYˆœ][Ü[K\™\Üİ\™H‹Øš™Xİ]™Nˆ”™]™[Üˆ[^H]Ù[\ÜÜÚ][ÛˆH][Ü[Hİ]H‹ØœÙ\˜X›Nˆ˜›ØÚÙY\\ÛÙ\ÈˆKˆÈYˆœ™[X]\™KXÛÜİ\™H‹Øš™Xİ]™Nˆ•\›Z[˜]HX˜]H™Y›Ü™H[™›Ü›X][Ûˆ\È[˜ÛÜœÜ˜]Y‹ØœÙ\˜X›Nˆœ™YÜ™]Y\ˆY[ˆ]šY[˜ÙH™]™X[ˆKˆÈYˆ›Z[›Üš]K\İ\™\ÜÚ[Ûˆ‹Øš™Xİ]™Nˆ”™YXÙHY™™Xİ]™H\XÚ\][ÛˆÙˆHZ[›Üš]HÛØ[][Ûˆ‹ØœÙ\˜X›Nˆœ\XÚ\][Û‹Ù˜Z\›™\ÜÈ]™\™Ù[˜ÙHˆKˆÈYˆœ›ØÙY\˜[YXYØÚÈ‹Øš™Xİ]™Nˆ“XZ[Z[ˆHYØ[]›Û‹]\›Z[˜][™È[İ[ÛˆÜÛÙŞH‹ØœÙ\˜X›Nˆ˜›İ[™YZÜš^›Ûˆ›ËY\ÜÜÚ][ÛˆˆB—JNÂ‚™^Ü[˜İ[Ûˆ]XÚĞØ][ÙÊ
-HÈ™]\›ˆ“ĞÑQTSĞUPÒÔË›X\
-Oˆ
-È‹‹JJNÈB‚‹ËÈKKKHØÙ[˜\š[ËšœÈKKKB™^Ü[˜İ[ÛˆÜ™X]TØÙ[˜\š[Ê[œ]
-HÂˆYˆ
-Z[œ]ËœØÙ[˜\š[ÒYZ[œ]Ë›YY][™ÒYP\œ˜^Kš\Ğ\œ˜^J[œ]›Y[X™\œÊJH›İÈ™]È\Q\œ›ÜŠœØÙ[˜\š[ÒYYY][™ÒYY[X™\œÈ™\]Z\™YŠNÂˆYˆ
-™]ÈÙ]
-[œ]›Y[X™\œÊKœÚ^™HOOH[œ]›Y[X™\œË›[™İ
-H›İÈ™]È\œ›ÜŠ”‘Q•TÑQ‘TPĞUWÓQSP‘TˆŠNÂˆ™]\›ˆØš™Xİ™œ™Y^™JÂˆØÙ[˜\š[ÒYˆ[œ]œØÙ[˜\š[ÒYˆØš™Xİ]™Nˆ[œ]›Øš™Xİ]™HÏÈœ™XXÚ]Ù[\ÜÜÚ][Ûˆ‹ˆ[™›Ü›X][Û”\][ÛœÎˆØš™Xİ™œ™Y^™J[œ]š[™›Ü›X][Û”\][ÛœÈÏÈßJKˆÛÜ›ˆÜ™X]SYY][™ÊÈYY][™ÒYˆ[œ]›YY][™ÒY[\Ù]Yˆ[œ]œ[\Ù]YY[X™\œÎˆ[œ]›Y[X™\œË™\Ù[ˆ[œ]œ™\Ù[ÏÈ[œ]›Y[X™\œË][Ü[Nˆ[œ]œ][Ü[HJBˆJNÂŸB‚‹ËÈKKKHXYİYKšœÈKKKB™^Ü[˜İ[ÛˆZ[XYİYJ[›™\œË›Û\ÊHÂˆ™]\›ˆØš™Xİ™œ™Y^™J[›™\œË™›]X\
-[›™\ˆOˆ›Û\Ë›X\
-›ÛHOˆYZ][›™\Š[›™\‹›ÛJJJJNÂŸB‚™^Ü[˜İ[Ûˆ[”ÛXŞQ\\ÛÙJÈ[›™\‹›ÛKXİÜ’Y[š\›Û›Y[X^İ\ÈHLJHÂˆÛÛœİYZ\ÜÚ[ÛˆHYZ][›™\Š[›™\‹›ÛJNÈYˆ
-XYZ\ÜÚ[Û‹˜YZ]Y
-H™]\›ˆØš™Xİ™œ™Y^™JÈİ[™[™Îˆ”‘Q•TÑQ‹YZ\ÜÚ[Û‹İ\Îˆ™XÙZ\Îˆ×HJNÂˆÛÛœİXİÜˆHÈXİÜ’Y›ÛK]]Üš]QÜ˜[YÎˆ×HNÂˆYˆ
-[š\›Û›Y[˜ÛÛ™šYË˜XİÜ‹˜XİÜ’YOOHXİÜ’Y[š\›Û›Y[˜ÛÛ™šYË˜XİÜ‹œ›ÛHOOH›ÛJH›İÈ™]È\œ›ÜŠ”‘Q•TÑQ‘TTÓÑWĞPÕÔ—ÓRTÓPUÒŠNÂˆ]İ\ÈHÂˆÚ[H
-İ\ÈX^İ\ÊHÂˆÛÛœİØœÈH[š\›Û›Y[›ØœÙ\™J
-NÈÛÛœİ›ÜÜØ[ÈH[›™\‹œ›ÜÜÙJØœËœİ]KXİÜŠNÈYˆ
-\›ÜÜØ[ÏË›[™İ
-Hœ™XZÎÂˆÛÛœİ™\İ[H[š\›Û›Y[˜Xİ
-›ÜÜØ[ÖÌJNÈİ\È
-ÏHNÂˆYˆ
-\™\İ[˜YZ]Y	‰ˆ[›™\‹œİÜÛ”™Y\Ø[OOH˜[ÙJHœ™XZÎÂˆYˆ
-[š\›Û›Y[›ØœÙ\™J
-Kœİ]Kœ\ÙHOOHQ“ÕT“‘QŠHœ™XZÎÂˆBˆ™]\›ˆØš™Xİ™œ™Y^™JÈİ[™[™Îˆİ\ÈX^İ\ÈÈSU‘Hˆˆ“ĞÒÑQ‹İ\Ë™XÙZ\Îˆ[š\›Û›Y[™[™Ú[™K›YÙ\‹˜[
+function freezeState(state) {
+  for (const motion of Object.values(state.motions)) Object.freeze(motion.votes);
+  return Object.freeze(state);
+}
 
-HJNÂŸB‚‹ËÈKKKH™\^KšœÈKKKB™^Ü[˜İ[Ûˆ™\^JÈ[š]X[İ]K™XÙZ\Ë[\Ù]]]Üš]HJHÂˆÛÛœİ[™Ú[™HH™]È\›X[Y[\Q[™Ú[™J[\Ù]]]Üš]JNÈ]İ]HH[š]X[İ]NÂˆ›Üˆ
-ÛÛœİ^XİYÙˆ™XÙZ\ÊHÂˆÛÛœİXİÜˆHÈXİÜ’Yˆ^XİY˜XİÜ’Y›ÛNˆ^XİYœ›ÛK]]Üš]QÜ˜[YÎˆ×HNÂˆÛÛœİXİX[H[™Ú[™K˜\Jİ]KXİÜ‹^XİY˜Xİ[ÛŠNÂˆYˆ
-XİX[œ™XÙZ\œ™XÙZ\\ÚOOH^XİYœ™XÙZ\\Ú
-H™]\›ˆØš™Xİ™œ™Y^™JÈÛÛ™›Ü›X[ˆ˜[ÙKİ]K^XİYˆ^XİYœ™XÙZ\\ÚXİX[ˆXİX[œ™XÙZ\œ™XÙZ\\ÚJNÂˆİ]HHXİX[œİ]NÂˆBˆ™]\›ˆØš™Xİ™œ™Y^™JÈÛÛ™›Ü›X[ˆYKİ]K™XÙZ\XYˆ[™Ú[™K›YÙ\‹˜[
+function votePassed(rule, votes) {
+  const values = Object.values(votes);
+  const yes = values.filter(vote => vote === "YES").length;
+  const no = values.filter(vote => vote === "NO").length;
+  if (rule.voteThreshold === "TWO_THIRDS") return yes > 0 && yes * 3 >= (yes + no) * 2;
+  return yes > no;
+}
 
-K˜]
-LJOËœ™XÙZ\\ÚÏÈ[JNÂŸB‚‹ËÈKKKHŞ[XXİšœÈKKKB™^ÜÛ\ÜÈ”‘Ş[Q[š\›Û›Y[ÂˆÛÛœİXİÜŠÛÛ™šYË[™Ú[™K™\šYšY\ˆH™]Èİ]TÜİÛÛ™][Û•™\šYšY\Š
-JHÈ\Ë˜ÛÛ™šYÈHÛÛ™šYÎÈ\Ë™[™Ú[™HH[™Ú[™NÈ\Ë™\šYšY\ˆH™\šYšY\È\Ëœİ]HHİXİ\™YÛÛ™JÛÛ™šYËš[š]X[İ]JNÈBˆØœÙ\™J
-HÈ™]\›ˆØš™Xİ™œ™Y^™JÈ\\ÛÙRYˆ\Ë˜ÛÛ™šYË™\\ÛÙRYİ]NˆİXİ\™YÛÛ™J\Ëœİ]JK™XÙZ\XYˆ\Ë™[™Ú[™K›YÙ\‹˜[
+function transition(state, actor, action, ruleset) {
+  const next = cloneState(state);
+  switch (action.type) {
+    case "RECOGNIZE":
+      if (!next.present.includes(action.memberId)) throw new Error(`REFUSED:MEMBER_NOT_PRESENT:${action.memberId}`);
+      next.recognizedMemberId = action.memberId;
+      break;
+    case "INTRODUCE_MOTION":
+      next.motions[action.motionId] = { motionId: action.motionId, kind: action.kind, text: action.text, makerId: actor.actorId, parentMotionId: action.parentMotionId ?? null, secondedBy: null, status: "PENDING", votes: {} };
+      next.pendingMotionIds.push(action.motionId);
+      next.recognizedMemberId = null;
+      break;
+    case "SECOND_MOTION":
+      next.motions[action.motionId].secondedBy = actor.actorId;
+      next.motions[action.motionId].status = "SECONDED";
+      break;
+    case "OPEN_DEBATE":
+      next.motions[action.motionId].status = "DEBATING";
+      break;
+    case "CLOSE_DEBATE":
+      next.motions[action.motionId].status = "READY_FOR_VOTE";
+      break;
+    case "CALL_VOTE":
+      next.motions[action.motionId].status = "VOTING";
+      break;
+    case "CAST_VOTE":
+      next.motions[action.motionId].votes[action.memberId] = action.vote;
+      break;
+    case "ANNOUNCE_RESULT": {
+      const motion = next.motions[action.motionId];
+      motion.status = votePassed(ruleset.motionRule(motion.kind), motion.votes) ? "ADOPTED" : "REJECTED";
+      next.pendingMotionIds = next.pendingMotionIds.filter(id => id !== action.motionId);
+      break;
+    }
+    case "POINT_OF_ORDER": {
+      const pointId = action.pointId ?? `${next.meetingId}:point:${Object.keys(next.pointsOfOrder).length + 1}`;
+      next.pointsOfOrder[pointId] = { pointId, memberId: action.memberId ?? actor.actorId, againstActionId: action.againstActionId ?? null, reason: action.reason ?? "", status: "PENDING", ruling: null };
+      break;
+    }
+    case "RULE_POINT_OF_ORDER":
+      next.pointsOfOrder[action.pointId].status = "RULED";
+      next.pointsOfOrder[action.pointId].ruling = action.ruling;
+      break;
+    case "APPEAL_RULING": {
+      const appealId = action.appealId ?? `${next.meetingId}:appeal:${Object.keys(next.appeals).length + 1}`;
+      next.appeals[appealId] = { appealId, pointId: action.pointId, actorId: actor.actorId, status: "PENDING" };
+      break;
+    }
+    case "ADJOURN_MEETING":
+      next.phase = "ADJOURNED";
+      break;
+    case "OBSERVE":
+      break;
+    default:
+      throw new Error(`REFUSED:UNKNOWN_ACTION:${action.type}`);
+  }
+  next.actionCount += 1;
+  return freezeState(next);
+}
 
-K˜]
-LJOËœ™XÙZ\\ÚÏÈ[JNÈBˆXİ
-Xİ[ÛŠHÈÛÛœİ™\İ[]\Ë™[™Ú[™K˜\J\Ëœİ]K\Ë˜ÛÛ™šYË˜XİÜ‹Xİ[ÛŠNÈ\Ëœİ]O\™\İ[œİ]NÈ™]\›ˆØš™Xİ™œ™Y^™JÈYZ]Yœ™\İ[˜YZ]Y‹‹Š™\İ[œ™Y\Ø[ŞÜ™Y\Ø[œ™\İ[œ™Y\Ø[NßJKØœÙ\˜][Û\Ë›ØœÙ\™J
-K™XÙZ\œ™\İ[œ™XÙZ\JNÈBˆ™\šYJ^XİY
-HÈÛÛœİØœÙ\™Y]\Ë›ØœÙ\™J
-NÈÛÛœİYÛY[]\Ë™\šYšY\‹™\šYJØœÙ\™Y^XİY
-NÈ™]\›ˆØš™Xİ™œ™Y^™JÈ‹‹šYÛY[ØœÙ\™YJNÈBˆÚXÚÜÚ[
+export class ParliamentaryEngine {
+  constructor(ruleset, authority = new DenyDoAuthorityResolver()) {
+    this.ruleset = assertRulesetProvider(ruleset);
+    this.authority = authority;
+    this.ledger = new ReceiptLedger();
+  }
 
-HÈ™]\›ˆ”ÓÓ‹œİš[™ÚYJ\Ëœİ]JNÈBˆ™\İÜ™JÚXÚÜÚ[
-HÈÛÛœİ\œÙYR”ÓÓ‹œ\œÙJÚXÚÜÚ[
-NÈYŠ\œÙY›YY][™ÒYOO]\Ëœİ]K›YY][™ÒY\œÙYœ[\Ù]YOO]\Ëœİ]Kœ[\Ù]Y
-H›İÈ™]È\œ›ÜŠ”‘Q•TÑQÒPÒÔÒS•ÒQS•UWÓRTÓPUÒŠNÈ\Ëœİ]OSØš™Xİ™œ™Y^™J\œÙY
-NÈBŸB‚‹ËÈKKKH›İšY\‹šœÈKKKB™^ÜÛ\ÜÈ”‘Ş[T›İšY\ˆÂˆÛÛœİXİÜŠÈ[\Ù]]]Üš]K™\šYšY\ˆJHÈ\Ëœ[\Ù]H[\Ù]È\Ë˜]]Üš]HH]]Üš]NÈ\Ë™\šYšY\ˆH™\šYšY\ÈBˆX]\šX[^™JÈ\\ÛÙRY[š]X[İ]KXİÜˆJHÂˆYˆ
-[š]X[İ]Kœ[\Ù]YOOH\Ëœ[\Ù]šY
-H›İÈ™]È\œ›ÜŠ”‘Q•TÑQ”•STÑUÒQS•UWÓRTÓPUÒŠNÂˆÛÛœİ[™Ú[™HH™]È\›X[Y[\Q[™Ú[™J\Ëœ[\Ù]\Ë˜]]Üš]JNÈ™]\›ˆ™]È”‘Ş[Q[š\›Û›Y[
-È\\ÛÙRY[š]X[İ]KXİÜˆK[™Ú[™K\Ë™\šYšY\ŠNÂˆBŸB
+  apply(state, actor, action) {
+    if (state.rulesetId !== this.ruleset.id) throw new Error("REFUSED:RULESET_IDENTITY_MISMATCH");
+    const consequence = consequenceOf(action);
+    let rejection = this.ruleset.validate(state, actor, action);
+    if (!rejection) rejection = this.authority.authorize(state, actor, action, consequence);
+
+    if (rejection) {
+      const receipt = this.ledger.append({ meetingId: state.meetingId, rulesetId: state.rulesetId, actorId: actor.actorId, actorRole: actor.role, action: structuredClone(action), consequence, admitted: false, refusal: rejection, beforeDigest: digest(state), afterDigest: digest(state) });
+      return Object.freeze({ admitted: false, state, refusal: rejection, receipt });
+    }
+
+    let next;
+    try {
+      next = transition(state, actor, action, this.ruleset);
+    } catch (error) {
+      const transitionRefusal = refusal("ACTION_REFUSED", String(error.message ?? error), "RRGYM-TRANSITION-001");
+      const receipt = this.ledger.append({ meetingId: state.meetingId, rulesetId: state.rulesetId, actorId: actor.actorId, actorRole: actor.role, action: structuredClone(action), consequence, admitted: false, refusal: transitionRefusal, beforeDigest: digest(state), afterDigest: digest(state) });
+      return Object.freeze({ admitted: false, state, refusal: transitionRefusal, receipt });
+    }
+
+    const receipt = this.ledger.append({ meetingId: state.meetingId, rulesetId: state.rulesetId, actorId: actor.actorId, actorRole: actor.role, action: structuredClone(action), consequence, admitted: true, refusal: null, beforeDigest: digest(state), afterDigest: digest(next) });
+    return Object.freeze({ admitted: true, state: next, refusal: null, receipt });
+  }
+}
+
+export const FrontierStatus = Object.freeze({ ALIVE: "ALIVE", DEFERRED: "DEFERRED", FALSIFIED: "FALSIFIED", REFUSED: "REFUSED" });
+
+export class PossibilityFrontier {
+  #items = new Map();
+
+  add(candidate) {
+    if (!candidate?.id) throw new TypeError("REFUSED:CANDIDATE_ID_REQUIRED");
+    if (this.#items.has(candidate.id)) throw new Error(`REFUSED:DUPLICATE_CANDIDATE:${candidate.id}`);
+    const item = Object.freeze({ ...structuredClone(candidate), status: FrontierStatus.ALIVE, history: [] });
+    this.#items.set(candidate.id, item);
+    return item;
+  }
+
+  get(id) {
+    return this.#items.get(id);
+  }
+
+  #replace(id, status, evidence) {
+    const current = this.#items.get(id);
+    if (!current) throw new Error(`REFUSED:UNKNOWN_CANDIDATE:${id}`);
+    if ([FrontierStatus.FALSIFIED, FrontierStatus.REFUSED].includes(current.status)) throw new Error(`REFUSED:TERMINAL_CANDIDATE:${id}`);
+    const next = Object.freeze({ ...current, status, history: Object.freeze([...current.history, Object.freeze({ status, evidence: structuredClone(evidence) })]) });
+    this.#items.set(id, next);
+    return next;
+  }
+
+  defer(id, reason) {
+    return this.#replace(id, FrontierStatus.DEFERRED, { reason });
+  }
+
+  revive(id, reason) {
+    return this.#replace(id, FrontierStatus.ALIVE, { reason });
+  }
+
+  falsify(id, evidence) {
+    if (!evidence?.receiptHash) throw new Error("REFUSED:FALSIFICATION_REQUIRES_RECEIPT");
+    return this.#replace(id, FrontierStatus.FALSIFIED, evidence);
+  }
+
+  refuse(id, evidence = {}) {
+    return this.#replace(id, FrontierStatus.REFUSED, evidence);
+  }
+}
+
+function candidateScore(candidate) {
+  const positive = candidate.evidence + candidate.expectedUtility + candidate.reversibility + candidate.novelty;
+  const negative = candidate.uncertainty + candidate.cost;
+  return Math.max(0, positive - negative);
+}
+
+export function allocateCMCA(candidates, budget) {
+  if (!Number.isFinite(budget) || budget < 0) throw new TypeError("REFUSED:INVALID_CMCA_BUDGET");
+  const admitted = candidates.filter(candidate => candidate.admitted);
+  if (admitted.length === 0) return Object.freeze([]);
+  const scored = admitted.map(candidate => ({ candidate, score: candidateScore(candidate) }));
+  const total = scored.reduce((sum, item) => sum + item.score, 0);
+  const denominator = total > 0 ? total : scored.length;
+  return Object.freeze(scored.map(({ candidate, score }) => Object.freeze({ candidateId: candidate.id, mass: budget * (total > 0 ? score : 1) / denominator })));
+}
+
+export function buildLeague(planners, roles) {
+  return Object.freeze(planners.flatMap(planner => roles.map(role => Object.freeze({ plannerId: planner.id, role, admitted: planner.compatibleRoles?.has(role) === true, planner }))));
+}
+
+export function receiptsToOcel(receipts) {
+  const events = {};
+  const objects = {};
+  for (const receipt of receipts) {
+    events[receipt.receiptId] = { "ocel:activity": receipt.action.type, "ocel:timestamp": `1970-01-01T00:00:${String(receipt.sequence).padStart(2, "0")}Z`, "ocel:omap": [receipt.meetingId], "ocel:vmap": { admitted: receipt.admitted, consequence: receipt.consequence, receiptHash: receipt.receiptHash } };
+    objects[receipt.meetingId] = { "ocel:type": "rrgym:Meeting", "ocel:ovmap": { rulesetId: receipt.rulesetId } };
+  }
+  return Object.freeze({ "ocel:global-log": { "ocel:version": "2.0" }, events, objects });
+}
+
+export function replay({ initialState, receipts, ruleset, authority = new DenyDoAuthorityResolver() }) {
+  const engine = new ParliamentaryEngine(ruleset, authority);
+  let state = initialState;
+  for (const expected of receipts) {
+    const actor = { actorId: expected.actorId, role: expected.actorRole, authorityGrantIds: [] };
+    const actual = engine.apply(state, actor, structuredClone(expected.action));
+    if (actual.receipt.receiptHash !== expected.receiptHash || actual.admitted !== expected.admitted) return Object.freeze({ conformant: false, state, receipts: engine.ledger.all() });
+    state = actual.state;
+  }
+  return Object.freeze({ conformant: engine.ledger.verify(), state, receipts: engine.ledger.all() });
+}
+
+const CAPABILITY_ACTIONS = Object.freeze(["RECOGNIZE", "INTRODUCE_MOTION", "SECOND_MOTION", "OPEN_DEBATE", "CLOSE_DEBATE", "CALL_VOTE", "CAST_VOTE", "ANNOUNCE_RESULT", "POINT_OF_ORDER", "RULE_POINT_OF_ORDER", "APPEAL_RULING", "ADJOURN_MEETING"]);
+
+export class RRGymEnvironment {
+  constructor({ episodeId, initialState, actor }, engine, verifier = new StatePostconditionVerifier()) {
+    this.episodeId = episodeId;
+    this.environmentId = `urn:rrgym:environment:${episodeId}`;
+    this.actor = structuredClone(actor);
+    this.engine = engine;
+    this.verifier = verifier;
+    this.state = initialState;
+    this.rulesetId = initialState.rulesetId;
+    this.meetingId = initialState.meetingId;
+  }
+
+  capabilities() {
+    return Object.freeze(CAPABILITY_ACTIONS.map(type => Object.freeze({ id: `rrgym.${type.toLowerCase()}`, actionType: type, consequence: consequenceOf({ type }) })));
+  }
+
+  observe() {
+    return Object.freeze({ episodeId: this.episodeId, environmentId: this.environmentId, state: structuredClone(this.state), receiptHead: this.engine.ledger.all().at(-1)?.receiptHash ?? null });
+  }
+
+  actuate(action, actor = this.actor) {
+    const result = this.engine.apply(this.state, actor, action);
+    if (result.admitted) this.state = result.state;
+    return result;
+  }
+
+  verify(expected) {
+    return this.verifier.verify(this.observe(), expected);
+  }
+
+  checkpoint() {
+    return canonicalJson({ episodeId: this.episodeId, meetingId: this.meetingId, rulesetId: this.rulesetId, state: this.state });
+  }
+
+  restore(checkpoint) {
+    const parsed = JSON.parse(checkpoint);
+    if (parsed.episodeId !== this.episodeId || parsed.meetingId !== this.meetingId || parsed.rulesetId !== this.rulesetId || parsed.state?.meetingId !== this.meetingId || parsed.state?.rulesetId !== this.rulesetId) throw new Error("REFUSED:CHECKPOINT_IDENTITY_MISMATCH");
+    this.state = Object.freeze(parsed.state);
+    return this.observe();
+  }
+
+  teardown() {
+    return Object.freeze({ episodeId: this.episodeId, receiptChainValid: this.engine.ledger.verify() });
+  }
+}
+
+export class RRGymProvider {
+  constructor({ ruleset = new PublicDomain1915Ruleset(), authority = new DenyDoAuthorityResolver(), verifier = new StatePostconditionVerifier() } = {}) {
+    this.name = "rrgym";
+    this.materializationRequiresAuthority = false;
+    this.ruleset = assertRulesetProvider(ruleset);
+    this.authority = authority;
+    this.verifier = verifier;
+  }
+
+  materialize({ episodeId, initialState, actor }) {
+    if (initialState.rulesetId !== this.ruleset.id) throw new Error("REFUSED:RULESET_IDENTITY_MISMATCH");
+    const engine = new ParliamentaryEngine(this.ruleset, this.authority);
+    return new RRGymEnvironment({ episodeId, initialState, actor }, engine, this.verifier);
+  }
+}
