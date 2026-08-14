@@ -1,0 +1,17 @@
+contract_version = "1"
+
+[gym]
+name = "rrgym"
+domain = "meeting_procedure_reasoning"
+mode = "offline_simulation"
+
+[exercise]
+id = "bootstrap.v1"
+kind = "offline_simulation"
+
+[maturity.planes]
+semantics = 2
+evaluation = 2
+runtime = 3
+evidence = 4
+operations = 2
