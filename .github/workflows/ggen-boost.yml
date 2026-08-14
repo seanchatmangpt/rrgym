@@ -1,0 +1,33 @@
+name: ggen-fortune5
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  semantic-pack:
+    runs-on: ubuntu-latest
+    env:
+      GGEN_VERSION: "26.8.15"
+      GGEN_SHA256: "f4c4ea396f5cec12cfa2dd46c13ac620291f9b83138f17ded6fa59c510dcfc42"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned ggen
+        run: |
+          set -euo pipefail
+          url="https://github.com/seanchatmangpt/ggen/releases/download/v${GGEN_VERSION}/ggen-x86_64-unknown-linux-gnu.tar.gz"
+          curl --fail --location --silent --show-error "$url" -o /tmp/ggen.tar.gz
+          echo "${GGEN_SHA256}  /tmp/ggen.tar.gz" | sha256sum --check --strict
+          mkdir -p /tmp/ggen-bin
+          tar -xzf /tmp/ggen.tar.gz -C /tmp/ggen-bin
+          ggen_bin="$(find /tmp/ggen-bin -type f -name ggen -perm -111 | head -n1)"
+          echo "GGEN_BIN=$ggen_bin" >> "$GITHUB_ENV"
+      - name: Generate twice and refuse non-idempotency
+        working-directory: ggen/rrgym-pack
+        run: |
+          "$GGEN_BIN" --version
+          timeout 5s "$GGEN_BIN" sync run
+          cp -r consumer /tmp/consumer.first
+          timeout 5s "$GGEN_BIN" sync run
+          diff -r /tmp/consumer.first consumer
