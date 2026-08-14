@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.env
+*.log
+.DS_Store
+
+# ggen sync run output/state (ggen/rrgym-pack)
+ggen/rrgym-pack/consumer/
+ggen/rrgym-pack/.ggen/
+ggen/rrgym-pack/.ggen-v2/
+ggen/rrgym-pack/ggen.lock

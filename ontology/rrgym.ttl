@@ -1,0 +1,24 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix org: <http://www.w3.org/ns/org#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix schema: <https://schema.org/> .
+
+<urn:rrgym:system:v26.8.12> a prov:Entity, schema:SoftwareApplication ;
+  dcterms:title "rrgym v26.8.12" ;
+  dcterms:description "Executable parliamentary governance gym" .
+
+<urn:rrgym:concept:chair> a skos:Concept ; skos:prefLabel "Chair" .
+<urn:rrgym:concept:parliamentarian> a skos:Concept ; skos:prefLabel "Parliamentarian" .
+<urn:rrgym:concept:member> a skos:Concept ; skos:prefLabel "Member" .
+<urn:rrgym:concept:observer> a skos:Concept ; skos:prefLabel "Observer" .
+
+<urn:rrgym:policy:no-ambient-do> a odrl:Policy ;
+  dcterms:title "No ambient consequential authority" ;
+  odrl:prohibition [ odrl:action <urn:rrgym:action:ambient-do> ] .
+
+<urn:rrgym:ruleset:public-domain:1915-seed:v1> a prov:Entity ;
+  dcterms:title "Public-domain 1915 parliamentary seed" ;
+  dcterms:source <https://www.gutenberg.org/ebooks/9097> ;
+  prov:wasDerivedFrom <urn:rrgym:source:robert-1915> .

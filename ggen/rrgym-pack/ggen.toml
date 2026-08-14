@@ -1,0 +1,11 @@
+[project]
+name = "rrgym-pack"
+
+[ontology]
+source = "ontology.ttl"
+
+[packs]
+rrgym-contract-pack = { path = "pack" }
+
+[templates]
+dir = "templates"

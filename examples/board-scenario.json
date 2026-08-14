@@ -1,0 +1,7 @@
+{
+  "scenarioId": "fortune5-architecture-board-001",
+  "meetingId": "architecture-review-board-001",
+  "rulesetId": "urn:rrgym:ruleset:public-domain:1915-seed:v1",
+  "members": ["chair", "enterprise-architect", "security", "finance", "operations"],
+  "objective": "Reach a lawful, receipted architecture disposition while preserving minority objections."
+}

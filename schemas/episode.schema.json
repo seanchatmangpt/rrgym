@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rrgym:schema:episode:v1",
+  "type": "object",
+  "required": ["scenarioId", "meetingId", "rulesetId", "members"],
+  "properties": {
+    "scenarioId": {"type": "string", "minLength": 1},
+    "meetingId": {"type": "string", "minLength": 1},
+    "rulesetId": {"type": "string", "minLength": 1},
+    "members": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "present": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "quorum": {"type": "integer", "minimum": 1},
+    "objective": {"type": "string"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,10 @@
+[pack]
+name = "rrgym-contract-pack"
+version = "0.1.0"
+description = """
+Ships rrgym's static parliamentary-world governance contract (WIT interface + PROV/ODRL
+ontology admitting the pack identity and the no-ambient-do prohibition on the `do`
+capability). Gate gates/010_contract.rq admits the ontology: the pack identity
+<urn:rrgym:pack:v26.8.12> must be a prov:Entity and <urn:rrgym:policy:no-ambient-do> must
+be an odrl:Policy prohibiting the `do` capability.
+"""

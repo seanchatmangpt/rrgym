@@ -1,0 +1,10 @@
+---
+to: consumer/rrgym/rrgym-contract.wit
+---
+package rrgym:governance@26.8.12;
+interface parliamentary-world {
+  record receipt-ref { id: string, hash: string }
+  variant consequence { read, construct, do }
+  variant admission { admitted(receipt-ref), refused(string) }
+}
+world rrgym { export parliamentary-world; }
