@@ -1,0 +1,24 @@
+schema = "chatman.federated-capability-owner.v1"
+version = "26.9.1"
+repository = "seanchatmangpt/rrgym"
+owner_id = "repository:rrgym"
+control_plane_repository = "seanchatmangpt/chatman-ecosystem"
+control_plane_subject = "git:475d36e9c716fbedb33db6b74b55b0edf6f73c71"
+base_sha = "9f3128ae2b5b752c0f5bb091b433231d226a3585"
+allowed_authorities = ["observe", "classify"]
+simulation_only = true
+ambient_do = false
+
+[[capability]]
+id = "capability:execute-bounded-domain-gym"
+relationship = "source"
+standing = "CANDIDATE"
+broker_required = false
+receipt_required = false
+
+[[capability]]
+id = "capability:reconstitute-project-protocol-suite"
+relationship = "source"
+standing = "CANDIDATE"
+broker_required = false
+receipt_required = false
