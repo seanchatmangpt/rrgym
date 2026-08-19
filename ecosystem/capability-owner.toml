@@ -3,11 +3,12 @@ version = "26.9.1"
 repository = "seanchatmangpt/rrgym"
 owner_id = "repository:rrgym"
 control_plane_repository = "seanchatmangpt/chatman-ecosystem"
-control_plane_subject = "git:475d36e9c716fbedb33db6b74b55b0edf6f73c71"
+control_plane_subject = "git:7430dfc9b3ca138e703430d25de7c6f48a8d6ade"
 base_sha = "9f3128ae2b5b752c0f5bb091b433231d226a3585"
 allowed_authorities = ["observe", "classify"]
 simulation_only = true
 ambient_do = false
+automatic_irreversible_do = false
 
 [[capability]]
 id = "capability:execute-bounded-domain-gym"
